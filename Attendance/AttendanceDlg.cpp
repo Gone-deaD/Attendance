@@ -30,6 +30,7 @@ BEGIN_MESSAGE_MAP(CAttendanceDlg, CDialogEx)
 	ON_BN_CLICKED(IDOK, &CAttendanceDlg::OnBnClickedOk)
 	ON_BN_CLICKED(IDCANCEL, &CAttendanceDlg::OnBnClickedCancel)
 	ON_BN_CLICKED(IDC_BUTTON1, &CAttendanceDlg::OnBnClickedButtonSelectMember)
+	ON_BN_CLICKED(IDC_BUTTON2, &CAttendanceDlg::OnBnClickedSelectTargetFile)
 END_MESSAGE_MAP()
 
 
@@ -91,19 +92,39 @@ void CAttendanceDlg::OnBnClickedOk()
 {
 	// TODO:  在此添加控件通知处理程序代码
 	// CDialogEx::OnOK();
-	CString filePath;
-	CWnd::GetDlgItemTextW(IDC_EDIT_MEMBER_FILE, filePath);
+	CString memberFilePath, targetFilePath;
+	CWnd::GetDlgItemTextW(IDC_EDIT_MEMBER_FILE, memberFilePath);
+	CWnd::GetDlgItemTextW(IDC_EDIT_TARGET_FILE, targetFilePath);
+	if (memberFilePath.IsEmpty()){
+		AfxMessageBox(L"请选择成员文件");
+		return;
+	}
+	if (targetFilePath.IsEmpty()){
+		AfxMessageBox(L"请定位目标文件夹位置");
+		return;
+	}
+
+	CButton *pBtn = (CButton *)GetDlgItem(IDOK);
+	pBtn->EnableWindow(FALSE); // True or False
+	
 	CFile memberfile;
-	BOOL opened = memberfile.Open(filePath, CFile::modeRead);
+	BOOL opened = memberfile.Open(memberFilePath, CFile::modeRead);
 	if (!opened)
 	{
 		AfxMessageBox(L"文件不存在，请重新选择文件");
 	}
-	CString member;
-	memberfile.Read(member.GetBuffer(memberfile.GetLength()), memberfile.GetLength());
+	int fileLength = memberfile.GetLength();
+	char *charBuf = new char[fileLength + 1];;
+	memberfile.Read(charBuf, fileLength);
+	CString member(charBuf);
+	// CString member = CA2W(charBuf, CP_UTF8);
 	memberfile.Close();
+	delete charBuf;
 	CWnd::SetDlgItemText(IDC_STATIC, member);
-	
+
+	//http://blog.csdn.net/fullsail/article/details/8449448
+
+	pBtn->EnableWindow(TRUE);
 }
 
 
@@ -126,4 +147,31 @@ void CAttendanceDlg::OnBnClickedButtonSelectMember()
 		filePath = openFileDlg.GetPathName();
 	}
 	CWnd::SetDlgItemTextW(IDC_EDIT_MEMBER_FILE, filePath);
+}
+
+
+void CAttendanceDlg::OnBnClickedSelectTargetFile()
+{
+	static TCHAR filePath[MAX_PATH];
+
+	CString openTitle = TEXT("选择一个源文件子文件夹");
+	BROWSEINFO bi;
+	bi.hwndOwner = ::GetFocus();
+	bi.pidlRoot = NULL;
+	bi.pszDisplayName = filePath;
+	bi.lpszTitle = openTitle;
+	bi.ulFlags = BIF_BROWSEFORCOMPUTER | BIF_DONTGOBELOWDOMAIN | BIF_RETURNONLYFSDIRS;
+	bi.lpfn = NULL; //BrowseCallbackProc; 设置回调函数，实现记忆路径
+	bi.lParam = 0;
+	bi.iImage = 0;
+
+	LPITEMIDLIST pItemIDList = ::SHBrowseForFolder(&bi);
+	if (pItemIDList == NULL)
+	{
+		return;
+	}
+
+	::SHGetPathFromIDList(pItemIDList, filePath);
+
+	CWnd::SetDlgItemTextW(IDC_EDIT_TARGET_FILE, filePath);
 }
